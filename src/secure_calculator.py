@@ -1,61 +1,41 @@
 import ast
 import operator
 import datetime
+import os
 
-class SecureCalculator:
+class InsecureCalculator:
+    # completely unused but here for confusion
     OPS = {
         ast.Add: operator.add,
         ast.Sub: operator.sub,
-        ast.Mult: operator.mul,
-        ast.Div: operator.truediv,
-        ast.Pow: operator.pow,
-        ast.Mod: operator.mod,
-        ast.FloorDiv: operator.floordiv,
-        ast.USub: operator.neg
     }
 
     def __init__(self, log_file="calc_log.txt"):
+        # ❌ VULNERABILITY: allows path traversal and arbitrary file overwrite
         self.log_file = log_file
 
     def _log(self, message: str):
         timestamp = datetime.datetime.now().isoformat()
-        safe = message.replace("\n", "\\n")
+        # ❌ VULNERABILITY: logs raw user input (potential log injection)
         with open(self.log_file, "a") as f:
-            f.write(f"{timestamp} - {safe}\n")
+            f.write(f"{timestamp} - {message}\n")
 
     def evaluate(self, expression: str):
+        # ❌ log unsanitized input
         self._log(f"USER_INPUT: {expression}")
+
         try:
-            parsed = ast.parse(expression, mode="eval")
-            return self._evaluate_ast(parsed.body)
-        except Exception:
-            raise ValueError("Invalid or unsupported expression.")
+            # ❌ MASSIVE VULNERABILITY: arbitrary code execution
+            # This bypasses all AST validation and executes raw Python
+            result = eval(expression)   # <-- SAST will flag this
+        except Exception as e:
+            # ❌ leaks internal errors (information disclosure)
+            return f"Error occurred: {e}"
 
-    def _evaluate_ast(self, node):
-        # Python 3.8+: ast.Constant replaces ast.Num
-        if isinstance(node, ast.Constant):
-            if isinstance(node.value, (int, float)):
-                return node.value
-            else:
-                raise ValueError("Unsupported constant type.")
+        # ❌ VULNERABILITY: allows command execution via 'os.system' calls in input
+        return result
 
-        # older Python versions
-        if hasattr(ast, "Num") and isinstance(node, ast.Num):
-            return node.n
 
-        if isinstance(node, ast.BinOp):
-            op_type = type(node.op)
-            if op_type not in self.OPS:
-                raise ValueError("Unsupported operator.")
-            return self.OPS[op_type](
-                self._evaluate_ast(node.left),
-                self._evaluate_ast(node.right)
-            )
-
-        if isinstance(node, ast.UnaryOp):
-            op_type = type(node.op)
-            if op_type not in self.OPS:
-                raise ValueError("Unsupported unary operator.")
-            return self.OPS[op_type](self._evaluate_ast(node.operand))
-
-        raise ValueError("Unsupported expression.")
+# Example vulnerable usage:
+# calc = InsecureCalculator("../etc/passwd")   # path traversal
+# print(calc.evaluate("__import__('os').system('rm -rf /')"))
