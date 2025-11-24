@@ -9,44 +9,44 @@ on:
 
 jobs:
   sonarqube:
-    name: SonarQube
+    name: Unit Tests + SonarQube
     runs-on: ubuntu-latest
 
     steps:
+      # Step 1: Checkout repository
       - uses: actions/checkout@v4
         with:
-          fetch-depth: 0   # Shallow clones should be disabled for a better relevancy of analysis
+          fetch-depth: 0
 
-      # ---------------------------
-      # 1. Set up Python environment
-      # ---------------------------
+      # Step 2: Set up Python
       - name: Set up Python
-        uses: actions/setup-python@v4
+        uses: actions/setup-python@v5
         with:
-          python-version: "3.x"
+          python-version: "3.10"
 
-      # ---------------------------------
-      # 2. Install dependencies for tests
-      # ---------------------------------
+      # Step 3: Install dependencies
       - name: Install Dependencies
         run: |
           python -m pip install --upgrade pip
-          pip install pytest
+          pip install -r requirements.txt
+          pip install coverage
 
-      # ---------------------------
-      # ---------------------------
-      # 3. Run Unit Tests
-      # ---------------------------
-      - name: Run Unit Tests
+      # Step 4: Run Unit Tests with Coverage
+      - name: Run Unit Tests with Coverage
         run: |
           export PYTHONPATH=$PYTHONPATH:./src
-          pytest -v
+          coverage run -m pytest -v
+          coverage xml
 
-
-      # ---------------------------
-      # 4. Run SonarQube Scan
-      # ---------------------------
+      # Step 5: SonarQube Scan
       - name: SonarQube Scan
         uses: SonarSource/sonarqube-scan-action@v6
         env:
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+
+      # (Optional) Step 6: Build Docker Image
+      - name: Build Docker Image
+        if: false   # Disable for now, enable later if needed
+        run: |
+          echo "Docker build step disabled."
+
