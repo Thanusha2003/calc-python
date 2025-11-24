@@ -1,61 +1,56 @@
+# test_secure_calculator.py
+
 import unittest
-from unittest.mock import patch
-from io import StringIO
-import builtins
-
-# Import the vulnerable code by placing it into a function.
-# Modify your vulnerable calculator file so the logic is inside a function:
-#
-# def run_calculator():
-#     ...  (your vulnerable code)
-#
-# Then import it:
-#
-# from vulnerable_calculator import run_calculator
-#
-# For demonstration, I will test the core eval behavior directly.
+from secure_calculator import SecureCalculator
 
 
-class TestVulnerableCalculator(unittest.TestCase):
+class TestSecureCalculator(unittest.TestCase):
 
-    @patch("builtins.input", side_effect=["2 + 2", "exit"])
-    @patch("sys.stdout", new_callable=StringIO)
-    def test_basic_addition(self, mock_stdout, mock_input):
-        """Test simple expression evaluation."""
-        from vulnerable_calculator import run_calculator
-        run_calculator()
+    def setUp(self):
+        self.calc = SecureCalculator(log_file="test_log.txt")
 
-        output = mock_stdout.getvalue()
-        self.assertIn("Result: 4", output)
+    def test_addition(self):
+        self.assertEqual(self.calc.evaluate("2 + 3"), 5)
 
-    @patch("builtins.input", side_effect=["10 * 5", "exit"])
-    @patch("sys.stdout", new_callable=StringIO)
-    def test_multiplication(self, mock_stdout, mock_input):
-        from vulnerable_calculator import run_calculator
-        run_calculator()
+    def test_subtraction(self):
+        self.assertEqual(self.calc.evaluate("10 - 4"), 6)
 
-        output = mock_stdout.getvalue()
-        self.assertIn("Result: 50", output)
+    def test_multiplication(self):
+        self.assertEqual(self.calc.evaluate("3 * 4"), 12)
 
-    @patch("builtins.input", side_effect=["1 / 0", "exit"])
-    @patch("sys.stdout", new_callable=StringIO)
-    def test_division_by_zero(self, mock_stdout, mock_input):
-        from vulnerable_calculator import run_calculator
-        run_calculator()
+    def test_division(self):
+        self.assertEqual(self.calc.evaluate("12 / 3"), 4)
 
-        output = mock_stdout.getvalue()
-        self.assertIn("Error occurred:", output)
+    def test_power(self):
+        self.assertEqual(self.calc.evaluate("2 ** 3"), 8)
 
-    @patch("builtins.input", side_effect=["__import__('os').system('echo hacked')", "exit"])
-    @patch("sys.stdout", new_callable=StringIO)
-    def test_code_execution(self, mock_stdout, mock_input):
-        """Confirms that eval executes arbitrary code (vulnerability demonstration)."""
-        from vulnerable_calculator import run_calculator
-        run_calculator()
+    def test_modulus(self):
+        self.assertEqual(self.calc.evaluate("10 % 3"), 1)
 
-        output = mock_stdout.getvalue()
-        # Command output appears in stdout
-        self.assertIn("hacked", output)
+    def test_floor_division(self):
+        self.assertEqual(self.calc.evaluate("10 // 3"), 3)
+
+    def test_unary_negative(self):
+        self.assertEqual(self.calc.evaluate("-5"), -5)
+
+    def test_parentheses(self):
+        self.assertEqual(self.calc.evaluate("(2 + 3) * 4"), 20)
+
+    def test_invalid_expression(self):
+        with self.assertRaises(ValueError):
+            self.calc.evaluate("2 + ")
+
+    def test_unsupported_operator(self):
+        with self.assertRaises(ValueError):
+            self.calc.evaluate("2 & 3")  # Bitwise ops not allowed
+
+    def test_no_function_calls(self):
+        with self.assertRaises(ValueError):
+            self.calc.evaluate("__import__('os').system('ls')")
+
+    def test_no_variable_access(self):
+        with self.assertRaises(ValueError):
+            self.calc.evaluate("a + 1")  # No variable names allowed
 
 
 if __name__ == "__main__":
