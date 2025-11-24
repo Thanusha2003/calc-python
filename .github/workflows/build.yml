@@ -1,12 +1,6 @@
-name: Build
+name: Build and Security Scan
 
-# REQUIRED: Allows ZAP to upload reports and avoid permission errors
-permissions:
-  contents: write
-  security-events: write
-  actions: write
-  pull-requests: write
-
+# Workflow triggers
 on:
   push:
     branches:
@@ -14,22 +8,28 @@ on:
   pull_request:
     types: [opened, synchronize, reopened]
 
+# Required permissions for ZAP PR annotations
+permissions:
+  contents: write
+  security-events: write
+  actions: write
+
 jobs:
-  sonarqube:
-    name: Unit Tests + SonarQube + ZAP DAST
+  build-and-scan:
+    name: Unit Tests + SonarQube + Docker + ZAP
     runs-on: ubuntu-latest
 
     steps:
-
       # ---------------------------
-      # 1. Checkout repo
+      # Step 1: Checkout repository
       # ---------------------------
-      - uses: actions/checkout@v4
+      - name: Checkout repository
+        uses: actions/checkout@v4
         with:
           fetch-depth: 0
 
       # ---------------------------
-      # 2. Setup Python
+      # Step 2: Setup Python
       # ---------------------------
       - name: Setup Python
         uses: actions/setup-python@v5
@@ -37,60 +37,81 @@ jobs:
           python-version: "3.10"
 
       # ---------------------------
-      # 3. Install dependencies
+      # Step 3: Install dependencies
       # ---------------------------
-      - name: Install Dependencies
+      - name: Install dependencies
         run: |
-          pip install --upgrade pip
+          python -m pip install --upgrade pip
           pip install -r requirements.txt
-          pip install pytest coverage flask
+          pip install coverage
 
       # ---------------------------
-      # 4. Run Unit Tests + Coverage
+      # Step 4: Run unit tests with coverage
       # ---------------------------
       - name: Run Unit Tests with Coverage
         run: |
           export PYTHONPATH=$PYTHONPATH:./src
-          coverage run -m pytest -v
+          coverage run -m unittest discover -s src -p "test*.py"
           coverage xml
 
       # ---------------------------
-      # 5. SonarQube Scan
+      # Step 5: SonarQube Scan
       # ---------------------------
       - name: SonarQube Scan
         uses: SonarSource/sonarqube-scan-action@v6
+        with:
+          args: >
+            -Dsonar.projectKey=Thanusha2003_calc-python
+            -Dsonar.organization=thanusha2003
+            -Dsonar.sources=src
+            -Dsonar.python.coverage.reportPaths=coverage.xml
         env:
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
 
       # ---------------------------
-      # 6. Build Docker Image
+      # Step 6: Build Docker image
       # ---------------------------
       - name: Build Docker Image
         run: |
-          docker build -t calc-app .
+          docker build -t calc-python:latest .
 
       # ---------------------------
-      # 7. Run Docker Container
+      # Step 7: Run Docker container
       # ---------------------------
-      - name: Run Docker Container
+      - name: Start Docker Container
         run: |
-          docker run -d -p 5000:5000 --name calc_container calc-app
-          sleep 5  # allow app to fully start
+          docker run -d --name calc-python-container -p 5000:5000 calc-python:latest
+          sleep 5  # wait for the app to start
 
       # ---------------------------
-      # 8. OWASP ZAP Baseline Scan
+      # Step 8: OWASP ZAP Baseline Scan
       # ---------------------------
       - name: OWASP ZAP Scan
         uses: zaproxy/action-baseline@v0.10.0
         with:
           target: "http://localhost:5000"
-          cmd_options: "-a --autooff"
+          cmd_options: "-a --autooff --report-html report.html"
+        env:
+          ZAP_AUTH_HEADER: ""
+          ZAP_AUTH_HEADER_VALUE: ""
+          ZAP_AUTH_HEADER_SITE: ""
 
       # ---------------------------
-      # 9. Cleanup container
+      # Step 9: Upload ZAP reports
+      # ---------------------------
+      - name: Upload ZAP Reports
+        uses: actions/upload-artifact@v3
+        with:
+          name: zap-reports
+          path: |
+            report.json
+            report.md
+            report.html
+
+      # ---------------------------
+      # Step 10: Stop Docker container
       # ---------------------------
       - name: Stop Docker Container
-        if: always()
         run: |
-          docker stop calc_container || true
-          docker rm calc_container || true
+          docker stop calc-python-container
+          docker rm calc-python-container
