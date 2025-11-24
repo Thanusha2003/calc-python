@@ -1,7 +1,8 @@
 # test_secure_calculator.py
 
 import unittest
-from secure_calculator import SecureCalculator
+from src.secure_calculator import SecureCalculator
+
 
 
 class TestSecureCalculator(unittest.TestCase):
