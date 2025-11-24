@@ -11,6 +11,10 @@ jobs:
   build-and-scan:
     name: Build, Test, Dockerize & Security Scan
     runs-on: ubuntu-latest
+    permissions: # <--- ADDED BLOCK START
+      contents: write
+      issues: write
+      pull-requests: write # <--- ADDED BLOCK END
 
     steps:
       # Step 1: Checkout repository
