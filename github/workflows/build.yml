@@ -9,19 +9,19 @@ on:
 
 jobs:
   build-and-scan:
-    name: Build, Test, SonarQube & ZAP Scan
+    name: Build, Test, SonarQube & ZAP
     runs-on: ubuntu-latest
 
     steps:
       # ---------------------------
-      # Step 1: Checkout repository
+      # 1. Checkout repository
       # ---------------------------
       - uses: actions/checkout@v4
         with:
-          fetch-depth: 0   # Required for SonarQube scan
+          fetch-depth: 0  # Required for SonarQube
 
       # ---------------------------
-      # Step 2: Setup Python
+      # 2. Setup Python
       # ---------------------------
       - name: Setup Python
         uses: actions/setup-python@v5
@@ -29,7 +29,7 @@ jobs:
           python-version: "3.10"
 
       # ---------------------------
-      # Step 3: Install dependencies
+      # 3. Install Dependencies
       # ---------------------------
       - name: Install Dependencies
         run: |
@@ -38,16 +38,16 @@ jobs:
           pip install coverage pytest
 
       # ---------------------------
-      # Step 4: Run Unit Tests with Coverage
+      # 4. Run Unit Tests with Coverage
       # ---------------------------
-      - name: Run Unit Tests with Coverage
+      - name: Run Unit Tests
         run: |
           export PYTHONPATH=$PYTHONPATH:./src
-          coverage run -m unittest discover -s test -p "*.py"
+          coverage run -m unittest discover -s src -p "test*.py"
           coverage xml
 
       # ---------------------------
-      # Step 5: SonarQube Scan
+      # 5. SonarQube Scan
       # ---------------------------
       - name: SonarQube Scan
         uses: SonarSource/sonarqube-scan-action@v6
@@ -56,27 +56,27 @@ jobs:
             -Dsonar.projectKey=Thanusha2003_calc-python
             -Dsonar.organization=thanusha2003
             -Dsonar.sources=src
-            -Dsonar.tests=test
             -Dsonar.python.coverage.reportPaths=coverage.xml
         env:
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
 
       # ---------------------------
-      # Step 6: Build Docker Image
+      # 6. Build Docker Image
       # ---------------------------
       - name: Build Docker Image
         run: |
-          docker build -t calc-python:latest .
+          docker build -t calc-python-app .
 
       # ---------------------------
-      # Step 7: Run Calculator Docker Container
+      # 7. Run Docker Container
       # ---------------------------
-      - name: Run Docker Container
+      - name: Start App Container
         run: |
-          docker run -d --name calc-container -p 5000:5000 calc-python:latest
+          docker run -d -p 5000:5000 --name calc-python-app calc-python-app
+          sleep 10  # Wait for container to start
 
       # ---------------------------
-      # Step 8: OWASP ZAP Baseline Scan
+      # 8. OWASP ZAP Baseline Scan
       # ---------------------------
       - name: OWASP ZAP Baseline Scan
         uses: zaproxy/action-baseline@v0.10.0
@@ -84,13 +84,9 @@ jobs:
           target: "http://localhost:5000"
           cmd_options: "-a --autooff -r report_baseline.html"
           allow_issue_writing: false
-        env:
-          ZAP_AUTH_HEADER: ""
-          ZAP_AUTH_HEADER_VALUE: ""
-          ZAP_AUTH_HEADER_SITE: ""
 
       # ---------------------------
-      # Step 9: OWASP ZAP Full Scan
+      # 9. OWASP ZAP Full Scan
       # ---------------------------
       - name: OWASP ZAP Full Scan
         uses: zaproxy/action-full-scan@v0.13.0
@@ -103,9 +99,9 @@ jobs:
           fail_action: false
 
       # ---------------------------
-      # Step 10: Stop Docker Container
+      # 10. Stop and Remove Docker Container
       # ---------------------------
-      - name: Stop Docker Container
+      - name: Cleanup Docker
         run: |
-          docker stop calc-container
-          docker rm calc-container
+          docker stop calc-python-app
+          docker rm calc-python-app
