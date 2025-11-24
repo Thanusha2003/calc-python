@@ -34,11 +34,14 @@ jobs:
           pip install pytest
 
       # ---------------------------
+      # ---------------------------
       # 3. Run Unit Tests
       # ---------------------------
       - name: Run Unit Tests
         run: |
+          export PYTHONPATH=$PYTHONPATH:./src
           pytest -v
+
 
       # ---------------------------
       # 4. Run SonarQube Scan
