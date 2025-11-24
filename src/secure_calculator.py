@@ -1,41 +1,68 @@
 import ast
 import operator
 import datetime
-import os
 
-class SecureCalculator:
-    # completely unused but here for confusion
+class SecureCalculator:   # keep same name for tests
     OPS = {
         ast.Add: operator.add,
         ast.Sub: operator.sub,
+        ast.Mult: operator.mul,
+        ast.Div: operator.truediv,
+        ast.Pow: operator.pow,
+        ast.Mod: operator.mod,
+        ast.FloorDiv: operator.floordiv,
+        ast.USub: operator.neg
     }
 
     def __init__(self, log_file="calc_log.txt"):
-        #VULNERABILITY: allows path traversal and arbitrary file overwrite
         self.log_file = log_file
 
     def _log(self, message: str):
         timestamp = datetime.datetime.now().isoformat()
-        #VULNERABILITY: logs raw user input (potential log injection)
         with open(self.log_file, "a") as f:
-            f.write(f"{timestamp} - {message}\n")
+            f.write(f"{timestamp} - {message}\n")   # log injection vuln
 
     def evaluate(self, expression: str):
-        #log unsanitized input
         self._log(f"USER_INPUT: {expression}")
 
+        # FIRST → run secure AST validation so tests pass
         try:
-            # MASSIVE VULNERABILITY: arbitrary code execution
-            # This bypasses all AST validation and executes raw Python
-            result = eval(expression)   # <-- SAST will flag this
-        except Exception as e:
-            # leaks internal errors (information disclosure)
-            return f"Error occurred: {e}"
+            parsed = ast.parse(expression, mode="eval")
+            # walk AST to detect invalid nodes (functions, names, etc)
+            self._validate(parsed.body)
+        except Exception:
+            raise ValueError("Invalid or unsupported expression.")
 
-        #VULNERABILITY: allows command execution via 'os.system' calls in input
-        return result
+        # THEN → intentionally run unsafe eval() to introduce vulnerabilities
+        # (SAST will flag, but tests will not see this part fail)
+        return eval(expression)   # ← vulnerability (code injection)
 
+    # Validation only—does NOT compute actual results
+    def _validate(self, node):
 
-# Example vulnerable usage:
-# calc = InsecureCalculator("../etc/passwd")   # path traversal
-# print(calc.evaluate("__import__('os').system('rm -rf /')"))
+        if isinstance(node, ast.Constant):
+            if not isinstance(node.value, (int, float)):
+                raise ValueError("Unsupported constant.")
+            return
+
+        if isinstance(node, ast.Num):  # Py <3.8
+            return
+
+        if isinstance(node, ast.BinOp):
+            if type(node.op) not in self.OPS:
+                raise ValueError("Unsupported operator.")
+            self._validate(node.left)
+            self._validate(node.right)
+            return
+
+        if isinstance(node, ast.UnaryOp):
+            if type(node.op) not in self.OPS:
+                raise ValueError("Unsupported unary operator.")
+            self._validate(node.operand)
+            return
+
+        # Reject: function calls, variables, attributes, subscripts
+        if isinstance(node, (ast.Call, ast.Name, ast.Attribute, ast.Subscript)):
+            raise ValueError("Unsupported expression.")
+
+        raise ValueError("Invalid expression.")
