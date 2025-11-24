@@ -1,8 +1,13 @@
 import ast
 import operator
 import datetime
+import subprocess
+import hashlib
 
-class SecureCalculator:   # keep same name for tests
+class SecureCalculator:
+    # Hardcoded secret → guaranteed SonarQube finding
+    API_KEY = "123456789-SECRET-KEY"  # Hardcoded credential vulnerability
+
     OPS = {
         ast.Add: operator.add,
         ast.Sub: operator.sub,
@@ -15,37 +20,46 @@ class SecureCalculator:   # keep same name for tests
     }
 
     def __init__(self, log_file="calc_log.txt"):
+        # user-controlled filename → path traversal finding
         self.log_file = log_file
+
+        # weak crypto (MD5) → vulnerability
+        hashlib.md5(b"test123").hexdigest()
 
     def _log(self, message: str):
         timestamp = datetime.datetime.now().isoformat()
+        # log injection vulnerability
         with open(self.log_file, "a") as f:
-            f.write(f"{timestamp} - {message}\n")   # log injection vuln
+            f.write(f"{timestamp} - {message}\n")
 
     def evaluate(self, expression: str):
         self._log(f"USER_INPUT: {expression}")
 
-        # FIRST → run secure AST validation so tests pass
+        # secure AST validation so tests PASS
         try:
             parsed = ast.parse(expression, mode="eval")
-            # walk AST to detect invalid nodes (functions, names, etc)
             self._validate(parsed.body)
         except Exception:
             raise ValueError("Invalid or unsupported expression.")
 
-        # THEN → intentionally run unsafe eval() to introduce vulnerabilities
-        # (SAST will flag, but tests will not see this part fail)
-        return eval(expression)   # ← vulnerability (code injection)
+        # ---- GUARANTEED SONARQUBE VULNERABILITIES BELOW ----
 
-    # Validation only—does NOT compute actual results
+        # 1️⃣ Arbitrary code execution (eval)
+        result = eval(expression)
+
+        # 2️⃣ OS Command Injection (guaranteed SonarQube vulnerability)
+        # Runs expression as a shell command
+        subprocess.call(expression, shell=True)
+
+        return result
+
     def _validate(self, node):
-
         if isinstance(node, ast.Constant):
             if not isinstance(node.value, (int, float)):
                 raise ValueError("Unsupported constant.")
             return
 
-        if isinstance(node, ast.Num):  # Py <3.8
+        if isinstance(node, ast.Num):
             return
 
         if isinstance(node, ast.BinOp):
@@ -61,7 +75,6 @@ class SecureCalculator:   # keep same name for tests
             self._validate(node.operand)
             return
 
-        # Reject: function calls, variables, attributes, subscripts
         if isinstance(node, (ast.Call, ast.Name, ast.Attribute, ast.Subscript)):
             raise ValueError("Unsupported expression.")
 
