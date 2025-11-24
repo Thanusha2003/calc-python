@@ -11,10 +11,13 @@ jobs:
   build-and-scan:
     name: Build, Test, Dockerize & Security Scan
     runs-on: ubuntu-latest
-    permissions: # <--- ADDED BLOCK START
+    
+    # START OF FIX: Add permissions to allow ZAP action to upload reports
+    permissions:
       contents: write
       issues: write
-      pull-requests: write # <--- ADDED BLOCK END
+      pull-requests: write
+    # END OF FIX
 
     steps:
       # Step 1: Checkout repository
