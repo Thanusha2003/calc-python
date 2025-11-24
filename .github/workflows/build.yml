@@ -1,68 +1,96 @@
 name: Build
 
+# REQUIRED: Allows ZAP to upload reports and avoid permission errors
+permissions:
+  contents: write
+  security-events: write
+  actions: write
+  pull-requests: write
+
 on:
   push:
-    branches: [main]
+    branches:
+      - main
   pull_request:
     types: [opened, synchronize, reopened]
 
 jobs:
-  analysis:
+  sonarqube:
+    name: Unit Tests + SonarQube + ZAP DAST
     runs-on: ubuntu-latest
 
     steps:
-      # Checkout repository
+
+      # ---------------------------
+      # 1. Checkout repo
+      # ---------------------------
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
 
-      # Setup Python
-      - name: Set up Python
+      # ---------------------------
+      # 2. Setup Python
+      # ---------------------------
+      - name: Setup Python
         uses: actions/setup-python@v5
         with:
           python-version: "3.10"
 
-      # Install Dependencies
+      # ---------------------------
+      # 3. Install dependencies
+      # ---------------------------
       - name: Install Dependencies
         run: |
           pip install --upgrade pip
           pip install -r requirements.txt
           pip install pytest coverage flask
 
-      # Run Unit Tests
+      # ---------------------------
+      # 4. Run Unit Tests + Coverage
+      # ---------------------------
       - name: Run Unit Tests with Coverage
         run: |
           export PYTHONPATH=$PYTHONPATH:./src
           coverage run -m pytest -v
           coverage xml
 
-      # SonarQube Scan
+      # ---------------------------
+      # 5. SonarQube Scan
+      # ---------------------------
       - name: SonarQube Scan
         uses: SonarSource/sonarqube-scan-action@v6
         env:
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
 
-      # Build Docker Image
+      # ---------------------------
+      # 6. Build Docker Image
+      # ---------------------------
       - name: Build Docker Image
         run: |
           docker build -t calc-app .
 
-      # Run Docker Container
+      # ---------------------------
+      # 7. Run Docker Container
+      # ---------------------------
       - name: Run Docker Container
         run: |
           docker run -d -p 5000:5000 --name calc_container calc-app
-          sleep 5  # Wait for container to start
+          sleep 5  # allow app to fully start
 
-      # OWASP ZAP Baseline Scan
+      # ---------------------------
+      # 8. OWASP ZAP Baseline Scan
+      # ---------------------------
       - name: OWASP ZAP Scan
         uses: zaproxy/action-baseline@v0.10.0
         with:
           target: "http://localhost:5000"
-          cmd_options: "-a"
+          cmd_options: "-a --autooff"
 
-      # Stop Container
+      # ---------------------------
+      # 9. Cleanup container
+      # ---------------------------
       - name: Stop Docker Container
         if: always()
         run: |
-          docker stop calc_container
-          docker rm calc_container
+          docker stop calc_container || true
+          docker rm calc_container || true
