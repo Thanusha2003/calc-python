@@ -1,43 +1,35 @@
-def calculator():
-    print("Simple Python Calculator")
-    print("------------------------")
-    print("Select an operation:")
-    print("1. Add")
-    print("2. Subtract")
-    print("3. Multiply")
-    print("4. Divide")
+# ⚠️ Extremely Vulnerable Python Calculator
+# This code contains multiple intentional security vulnerabilities
+# and must NOT be used in production.
 
-    choice = input("Enter your choice (1-4): ")
+import os
+import datetime
 
-    if choice not in ['1', '2', '3', '4']:
-        print("Invalid choice! Please run the program again.")
-        return
+print("=== VULNERABLE Python Calculator ===")
+print("Type ANY Python expression and it will be executed.")
+print("Example: 2 + 2")
+print("You can also run system commands like: __import__('os').system('dir')\n")
+
+# Insecure logging (sensitive data exposure)
+log_file = "calc_log.txt"
+
+while True:
+    expr = input("Enter expression (or type 'exit' to quit): ")
+
+    if expr.lower() == "exit":
+        print("Goodbye!")
+        break
+
+    # Log input without sanitizing — vulnerable to log injection
+    with open(log_file, "a") as f:
+        f.write(f"{datetime.datetime.now()} - USER INPUT: {expr}\n")
 
     try:
-        num1 = float(input("Enter first number: "))
-        num2 = float(input("Enter second number: "))
-    except ValueError:
-        print("Invalid number! Please enter digits only.")
-        return
+        # CRITICAL VULNERABILITY: eval() executes arbitrary code
+        result = eval(expr)
 
-    if choice == '1':
-        result = num1 + num2
-        op = "+"
-    elif choice == '2':
-        result = num1 - num2
-        op = "-"
-    elif choice == '3':
-        result = num1 * num2
-        op = "*"
-    elif choice == '4':
-        if num2 == 0:
-            print("Error: Cannot divide by zero.")
-            return
-        result = num1 / num2
-        op = "/"
+        print("Result:", result)
 
-    print(f"\nResult: {num1} {op} {num2} = {result}")
-
-
-# Run the calculator
-calculator()
+    except Exception as e:
+        # Leaks internal error details to the user (information disclosure)
+        print("Error occurred:", e)
