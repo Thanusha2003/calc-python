@@ -14,9 +14,9 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
-          fetch-depth: 0  # Shallow clones should be disabled for a better relevancy of analysis
+          fetch-depth: 0
 
       - name: SonarQube Scan
-        uses: SonarSource/sonarqube-scan-action@8e9c4d8a7e4adadbe4f7f63cbb6e2ca8e52739b4
+        uses: SonarSource/sonarqube-scan-action@9a4e6db3d66b5c42f9156a9f0428c8b9b95f1b6f
         env:
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
