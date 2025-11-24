@@ -7,17 +7,16 @@ on:
   pull_request:
     types: [opened, synchronize, reopened]
 
+# Fix 1: set workflow-level permissions
+permissions:
+  contents: write
+  issues: write
+  pull-requests: write
+
 jobs:
   build-and-scan:
     name: Build, Test, Dockerize & Security Scan
     runs-on: ubuntu-latest
-    
-    # START OF FIX: Add permissions to allow ZAP action to upload reports
-    permissions:
-      contents: write
-      issues: write
-      pull-requests: write
-    # END OF FIX
 
     steps:
       # Step 1: Checkout repository
@@ -63,6 +62,12 @@ jobs:
       # Step 7: Run Docker Container
       - name: Run Docker Container
         run: docker run -d -p 5000:5000 --name calc-container calc-app
+
+      # Step 7b: Wait for container to be ready
+      - name: Wait for App
+        run: |
+          echo "Waiting for app to start..."
+          sleep 10  # Adjust if your app takes longer
 
       # Step 8: OWASP ZAP Baseline Scan
       - name: OWASP ZAP Baseline Scan
